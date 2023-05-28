@@ -13,4 +13,6 @@ Just run the requirements.bat first for the python requirements if not already i
 There's some errors but hey, it works.
 
 
-use pyinstaller to create a .exe file with this command pyinstaller -onefile main.py
+use pyinstaller to create a .exe file with this command: 
+pyinstaller --onefile main.py
+
