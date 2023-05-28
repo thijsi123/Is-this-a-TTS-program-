@@ -1,4 +1,6 @@
 @echo off
+python create_venv.py
+start "create_venv.exe"
 call venv\Scripts\activate
 pip install -r requirements.txt
 
