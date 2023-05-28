@@ -1,0 +1,11 @@
+Pillow
+pyttsx3
+pyautogui
+pytesseract
+numpy
+playsound
+pydub
+gtts
+pygame
+wave
+simpleaudio
