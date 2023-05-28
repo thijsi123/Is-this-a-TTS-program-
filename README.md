@@ -6,8 +6,11 @@ So...
 
 Uhhmmm...
 
-This might not work for you first try.
+This might not work for you first try. ( or at all, depending on how 'good'  the scripts are)
 
 Just run the requirements.bat first for the python requirements if not already installed annd ffmpeg, ffplay and ffprobe.
 
 There's some errors but hey, it works.
+
+
+use pyinstaller to create a .exe file with this command pyinstaller -onefile main.py
