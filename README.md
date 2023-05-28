@@ -16,3 +16,4 @@ There's some errors but hey, it works.
 use pyinstaller to create a .exe file with this command: 
 pyinstaller --onefile main.py
 
+I'm tired, I'll finish this later ; )
