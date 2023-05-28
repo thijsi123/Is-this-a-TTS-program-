@@ -1,5 +1,5 @@
 # Is-this-a-TTS-program- (?)
-This might be the worst and most or should I say less organized tts 'application' ever made.
+This might be the worst and most or should I say least organized tts 'application' ever made.
 
 TESTED ON WINDOWS ONLY
 So...
