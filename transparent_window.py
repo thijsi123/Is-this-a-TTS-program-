@@ -8,19 +8,13 @@ from threading import Thread
 from time import sleep
 import pygetwindow as gw
 import win32gui
-import screeninfo
 import os
 import screeninfo
 import pytesseract
 import PIL.Image as Image
-from gtts import gTTS
-from pydub import AudioSegment
-from pydub.playback import play
 import playsound
 from tkinter import Scale
-from tkinter import LEFT, RIGHT, BOTH
-import customtkinter
-from customtkinter import CTkButton
+
 
 class TextToSpeech:
     def __init__(self):
@@ -31,9 +25,14 @@ class TextToSpeech:
         self.current_voice = self.voices[0].id
 
     def start_tts(self, text, speed=1.0, pitch=1.0):
-        self.set_speed(speed * 150)
         self.set_volume(pitch)
         self.engine.setProperty('voice', self.current_voice)
+
+        if self.enable_speed_var.get():  # Check if speed checkbox is enabled
+            self.set_speed(speed * 150)  # Apply the speed multiplier
+        else:
+            self.set_speed(150)  # Set speed to default 150
+
         self.engine.save_to_file(text, 'C:/Python Projects/TTS/temp.wav')
         self.engine.runAndWait()  # Wait for the synthesis to finish
         print("Saved audio to: ", os.path.abspath('C:/Python Projects/TTS/temp.wav'))
@@ -49,10 +48,10 @@ class TextToSpeech:
 
     def set_speed(self, speed):
         self.engine.setProperty('rate', speed)
+        self.speed_multiplier = speed / 150  # Update the speed multiplier
 
     def set_volume(self, volume):
         self.engine.setProperty('volume', volume)
-
 
 class TransparentWindow:
     def __init__(self, tts):
@@ -124,14 +123,23 @@ class TransparentWindow:
 
         self.toggle_speed_slider()
 
-    def update_speed(self, speed):
-        self.tts.set_speed(float(speed))
-
     def toggle_speed_slider(self):
         if self.enable_speed_var.get():
             self.speed_slider.config(state='normal')
         else:
             self.speed_slider.config(state='disabled')
+            if not self.enable_speed_var.get():
+                self.speed_slider.set(1.1)
+                self.tts.set_speed(1.1)
+
+    def update_speed(self, speed):
+        if self.enable_speed_var.get():
+            self.tts.set_speed(float(speed))
+        else:
+            self.tts.set_speed(float(1.1))
+            print('Speed is disabled')
+
+
 
     def start_drag(self, event):
         self.root.x = event.x
@@ -149,11 +157,12 @@ class TransparentWindow:
         self.button_window.y = event.y
 
     def drag_window2(self, event):
-        deltax = event.x - self.button_window.x
-        deltay = event.y - self.button_window.y
-        x = self.button_window.winfo_x() + deltax
-        y = self.button_window.winfo_y() + deltay
-        self.button_window.geometry(f"+{x}+{y}")
+        if event.widget == self.button_window:
+            deltax = event.x - self.button_window.x
+            deltay = event.y - self.button_window.y
+            x = self.button_window.winfo_x() + deltax
+            y = self.button_window.winfo_y() + deltay
+            self.button_window.geometry(f"+{x}+{y}")
 
     def set_always_on_top(self):
         self.root.attributes('-topmost', self.always_on_top_var.get())
