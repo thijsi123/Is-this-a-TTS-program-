@@ -19,7 +19,8 @@ from pydub.playback import play
 import playsound
 from tkinter import Scale
 from tkinter import LEFT, RIGHT, BOTH
-
+import customtkinter
+from customtkinter import CTkButton
 
 class TextToSpeech:
     def __init__(self):
@@ -76,7 +77,8 @@ class TransparentWindow:
         self.button = tk.Button(
             self.button_window,
             text='Capture',
-            command=self.capture_screen
+            command=self.capture_screen,
+            bg="red"
         )
         self.button.place(relx=0.5, rely=0.5, anchor='center', relwidth=1.0, relheight=0.5, bordermode=OUTSIDE)
 
@@ -86,13 +88,18 @@ class TransparentWindow:
 
         self.button_window.protocol("WM_DELETE_WINDOW", self.on_button_window_closed)
 
-        # Allow dragging of the window
+        # Allow dragging of the windows
         self.root.bind('<ButtonPress-1>', self.start_drag)
-
         self.root.bind('<B1-Motion>', self.drag_window)
+
+        self.button_window.bind('<ButtonPress-1>', self.start_drag2)
+        self.button_window.bind('<B1-Motion>', self.drag_window2)
 
         # Track the root window's size changes
         self.root.bind('<Configure>', self.resize_button)
+
+        # Track the button window's size changes
+        self.button_window.bind('<Configure>', self.resize_button2)
 
         self.speed_slider = Scale(
             self.button_window,
@@ -128,11 +135,25 @@ class TransparentWindow:
 
     def start_drag(self, event):
         self.root.x = event.x
+        self.root.y = event.y
 
     def drag_window(self, event):
         deltax = event.x - self.root.x
+        deltay = event.y - self.root.y
         x = self.root.winfo_x() + deltax
-        self.root.geometry(f"+{x}+0")
+        y = self.root.winfo_y() + deltay
+        self.root.geometry(f"+{x}+{y}")
+
+    def start_drag2(self, event):
+        self.button_window.x = event.x
+        self.button_window.y = event.y
+
+    def drag_window2(self, event):
+        deltax = event.x - self.button_window.x
+        deltay = event.y - self.button_window.y
+        x = self.button_window.winfo_x() + deltax
+        y = self.button_window.winfo_y() + deltay
+        self.button_window.geometry(f"+{x}+{y}")
 
     def set_always_on_top(self):
         self.root.attributes('-topmost', self.always_on_top_var.get())
@@ -147,6 +168,10 @@ class TransparentWindow:
         os._exit(0)
 
     def resize_button(self, event):
+        button_size = min(event.width, event.height)  # Size the button to the smaller dimension
+        self.button.configure(width=button_size, height=button_size)
+
+    def resize_button2(self, event):
         button_size = min(event.width, event.height)  # Size the button to the smaller dimension
         self.button.configure(width=button_size, height=button_size)
 
@@ -199,11 +224,11 @@ class TransparentWindow:
             screenshot.save(screenshot_path)
 
             # Preprocess the image
-            processed_image = self.preprocess_image(screenshot)
+            #processed_image = self.preprocess_image(screenshot)
 
             # Save the preprocessed image
-            processed_image_path = "processed_screenshot.png"
-            processed_image.save(processed_image_path)
+            #processed_image_path = "processed_screenshot.png"
+            #processed_image.save(processed_image_path)
 
             # Restore the window's previous opacity
             self.root.attributes('-alpha', initial_opacity)
@@ -211,7 +236,9 @@ class TransparentWindow:
             # Add a delay to prevent continuous capturing
             sleep(0.1)
 
-            extracted_text = pytesseract.image_to_string(processed_image)
+
+            # Extract text from the preprocessed image
+            extracted_text = pytesseract.image_to_string(screenshot) #processed_image
             modified_text = self.modify_text(extracted_text, word_mapping)
 
             if extracted_text:
@@ -237,9 +264,6 @@ class TransparentWindow:
             if not button_pressed:
                 break
 
-        # Hide the window if it was visible during the capture process
-        if is_visible:
-            self.root.withdraw()
 
     def modify_text(self, text, word_mapping):
         # Split the text into words
