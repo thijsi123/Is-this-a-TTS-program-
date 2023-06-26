@@ -111,9 +111,17 @@ class TTSButtons(tk.Frame):
             text='Female',
             command=lambda: self.set_tts_voice('HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0')
         )
+        #Failed to add peterg voice
+        peterg_button = tk.Button(
+            self,
+            text='Peterg',
+            command=lambda: self.set_tts_voice('G:\AI\RVC-beta\RVC-beta-v2-0618\weights\peterg.pth')
+        )
 
         male_button.pack(side='left', padx=5, pady=5)
         female_button.pack(side='left', padx=5, pady=5)
+        #peterg_button.pack(side='left', padx=5, pady=5)
+
 
 
 class ColorWheel(tk.Canvas):

@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import OUTSIDE
+
+import dl_translate
 from PIL import ImageGrab, ImageDraw, ImageTk, ImageOps
 import colorsys
 import math
@@ -13,45 +15,30 @@ import screeninfo
 import pytesseract
 import PIL.Image as Image
 import playsound
-from tkinter import Scale
+from tkinter import OUTSIDE, StringVar, OptionMenu, Scale
+import dl_translate as dlt
+import torch
+
+from tts import TextToSpeech
+
+# Check if a GPU is available
+if torch.cuda.is_available():
+    device = torch.device("cuda")  # a CUDA device object
+    print(f"GPU {torch.cuda.get_device_name(0)} is available.")
+else:
+    device = torch.device("cpu")
+    print("No GPU available, using the CPU instead.")
+
+# Initialize the translation model outside the function (e.g., in the constructor)
+mt = None  # Declare the variable for the translation model
 
 
-class TextToSpeech:
-    def __init__(self):
-        self.engine = pyttsx3.init()
-        self.engine.setProperty('rate', 150)
-        self.engine.setProperty('volume', 1.0)
-        self.voices = self.engine.getProperty('voices')
-        self.current_voice = self.voices[0].id
+def load_model():
+    global mt
 
-    def start_tts(self, text, speed=1.0, pitch=1.0):
-        self.set_volume(pitch)
-        self.engine.setProperty('voice', self.current_voice)
+    # Initialize the translation model outside the function (e.g., in the constructor)
+    mt = dlt.TranslationModel("cached_model_m2m100", model_family="m2m100", device="auto")
 
-        if self.enable_speed_var.get():  # Check if speed checkbox is enabled
-            self.set_speed(speed * 150)  # Apply the speed multiplier
-        else:
-            self.set_speed(150)  # Set speed to default 150
-
-        self.engine.save_to_file(text, 'C:/Python Projects/TTS/temp.wav')
-        self.engine.runAndWait()  # Wait for the synthesis to finish
-        print("Saved audio to: ", os.path.abspath('C:/Python Projects/TTS/temp.wav'))
-
-        # Now play the saved audio file
-        playsound.playsound('C:/Python Projects/TTS/temp.wav')
-
-    def stop_tts(self):
-        self.engine.stop()
-
-    def set_voice(self, voice_id):
-        self.current_voice = voice_id
-
-    def set_speed(self, speed):
-        self.engine.setProperty('rate', speed)
-        self.speed_multiplier = speed / 150  # Update the speed multiplier
-
-    def set_volume(self, volume):
-        self.engine.setProperty('volume', volume)
 
 class TransparentWindow:
     def __init__(self, tts):
@@ -73,13 +60,58 @@ class TransparentWindow:
         self.button_window.title('Capture Button')
         self.button_window.geometry('200x200')
 
+        self.source_language_var = StringVar()
+        self.source_language_var.set('Dutch')  # Set the default source language
+
+        self.source_language_label = tk.Label(self.button_window, text='Source Language')
+        self.source_language_label.pack()
+
+        self.source_language_menu = OptionMenu(self.button_window, self.source_language_var,
+                                               'Afrikaans', 'Amharic', 'Arabic', 'Asturian', 'Azerbaijani', 'Bashkir',
+                                               'Belarusian', 'Bulgarian', 'Bengali', 'Breton', 'Bosnian', 'Catalan',
+                                               'Valencian', 'Cebuano', 'Czech', 'Welsh', 'Danish', 'German', 'Greek',
+                                               'English', 'Spanish', 'Estonian', 'Persian', 'Fulah', 'Finnish',
+                                               'French', 'Western Frisian', 'Irish', 'Gaelic', 'Scottish Gaelic',
+                                               'Galician', 'Gujarati', 'Hausa', 'Hebrew', 'Hindi', 'Croatian',
+                                               'Haitian', 'Haitian Creole', 'Hungarian', 'Armenian', 'Indonesian',
+                                               'Igbo', 'Iloko', 'Icelandic', 'Italian', 'Japanese', 'Javanese',
+                                               'Georgian', 'Kazakh', 'Khmer', 'Central Khmer', 'Kannada', 'Korean',
+                                               'Luxembourgish', 'Letzeburgesch', 'Ganda', 'Lingala', 'Lao',
+                                               'Lithuanian', 'Latvian', 'Malagasy', 'Macedonian', 'Malayalam',
+                                               'Mongolian', 'Marathi', 'Malay', 'Burmese', 'Nepali', 'Dutch', 'Flemish',
+                                               'Norwegian', 'Northern Sotho', 'Occitan', 'Oriya', 'Panjabi', 'Punjabi',
+                                               'Polish', 'Pushto', 'Pashto', 'Portuguese', 'Romanian', 'Moldavian',
+                                               'Moldovan', 'Russian', 'Sindhi', 'Sinhala', 'Sinhalese', 'Slovak',
+                                               'Slovenian', 'Somali', 'Albanian', 'Serbian', 'Swati', 'Sundanese',
+                                               'Swedish', 'Swahili', 'Tamil', 'Thai', 'Tagalog', 'Tswana', 'Turkish',
+                                               'Ukrainian', 'Urdu', 'Uzbek', 'Vietnamese', 'Wolof', 'Xhosa', 'Yiddish',
+                                               'Yoruba', 'Chinese', 'Zulu')
+        self.source_language_menu.pack()
+
+        self.skip_translation_var = tk.BooleanVar()
+        self.skip_translation_var.set(True)  # Set the initial value to True
+        self.skip_translation_checkbox = tk.Checkbutton(
+            self.button_window,
+            text='Skip Translation',
+            variable=self.skip_translation_var,
+            command=self.toggle_translation
+        )
+        self.skip_translation_checkbox.pack()
+
         self.button = tk.Button(
             self.button_window,
             text='Capture',
             command=self.capture_screen,
             bg="red"
         )
-        self.button.place(relx=0.5, rely=0.5, anchor='center', relwidth=1.0, relheight=0.5, bordermode=OUTSIDE)
+        self.button2 = tk.Button(
+            self.button_window,
+            text='AI Speach',
+            command=self.capture_screen2,
+            bg="blue"
+        )
+        self.button2.place(relx=0.5, rely=0.5, anchor='nw', relwidth=0.5, relheight=0.55, bordermode=OUTSIDE)
+        self.button.place(relx=0.5, rely=0.5, anchor='ne', relwidth=0.5, relheight=0.55, bordermode=OUTSIDE)
 
         self.transparency = 0.7
 
@@ -138,8 +170,6 @@ class TransparentWindow:
         else:
             self.tts.set_speed(float(1.1))
             print('Speed is disabled')
-
-
 
     def start_drag(self, event):
         self.root.x = event.x
@@ -205,9 +235,9 @@ class TransparentWindow:
         initial_opacity = self.root.attributes('-alpha')
 
         # Define word substitution mapping
-        word_mapping = {
-            "Thijs": "Thice", #works like 50% of the time -_-
-            "thijs": "Thighse",#<-|
+        self.word_mapping = {
+            "Thijs": "Thice",  # works like 50% of the time -_-
+            "thijs": "Thighse",  # <-|
             "have": "haave"
 
             # Add more word substitutions as needed
@@ -233,11 +263,11 @@ class TransparentWindow:
             screenshot.save(screenshot_path)
 
             # Preprocess the image
-            #processed_image = self.preprocess_image(screenshot)
+            # processed_image = self.preprocess_image(screenshot)
 
             # Save the preprocessed image
-            #processed_image_path = "processed_screenshot.png"
-            #processed_image.save(processed_image_path)
+            # processed_image_path = "processed_screenshot.png"
+            # processed_image.save(processed_image_path)
 
             # Restore the window's previous opacity
             self.root.attributes('-alpha', initial_opacity)
@@ -245,11 +275,10 @@ class TransparentWindow:
             # Add a delay to prevent continuous capturing
             sleep(0.1)
 
-
             # Extract text from the preprocessed image
-            extracted_text = pytesseract.image_to_string(screenshot) #processed_image
-            modified_text = self.modify_text(extracted_text, word_mapping)
-
+            extracted_text = pytesseract.image_to_string(screenshot)  # processed_image
+            # modified_text = self.modify_text(extracted_text, word_mapping)
+            # translated_text = self.translate_text(extracted_text, self.word_mapping)
             if extracted_text:
                 # Show the window if not visible
                 if not is_visible:
@@ -258,9 +287,9 @@ class TransparentWindow:
 
                 # Stop any ongoing TTS synthesis
                 self.tts.stop_tts()
-
+                translated_text = self.translate_text(extracted_text, self.word_mapping)
                 # Start TTS synthesis with the modified extracted text
-                self.tts.start_tts(modified_text, speed=float(self.speed_slider.get()))
+                self.tts.start_tts(translated_text, speed=float(self.speed_slider.get()))
                 self.button.config(state='normal')
             else:
                 # Debug message when no text is detected
@@ -273,6 +302,94 @@ class TransparentWindow:
             if not button_pressed:
                 break
 
+    ############################################################################################################### second button
+    def capture_screen2(self):
+        # Disable the capture button to prevent multiple clicks
+        self.button.config(state='disabled')
+
+        # Execute the capture process in a separate thread
+        capture_thread = Thread(target=self._capture_process2)
+        capture_thread.start()
+
+    def _capture_process2(self):
+        # Get the screen resolution
+        screen = screeninfo.get_monitors()[0]  # Assumes a single monitor setup
+        screen_width, screen_height = screen.width, screen.height
+        Image.MAX_IMAGE_PIXELS = None
+
+        # Set initial window visibility flag
+        is_visible = False
+
+        # Get the initial opacity value
+        initial_opacity = self.root.attributes('-alpha')
+
+        # Define word substitution mapping
+        self.word_mapping = {
+            "Thijs": "Thice",  # works like 50% of the time -_-
+            "thijs": "Thighse",  # <-|
+            "have": "haave"
+
+            # Add more word substitutions as needed
+        }
+
+        while True:
+            # Get the root window
+            root_window = gw.getWindowsWithTitle(self.root.title())[0]
+
+            # Get the window's handle
+            window_handle = root_window._hWnd
+
+            # Get the window's position and dimensions
+            rect = win32gui.GetWindowRect(window_handle)
+            left, top, right, bottom = rect
+
+            # Set the window opacity to 0
+            self.root.attributes('-alpha', 0)
+
+            # Capture the screen region of the root window
+            screenshot = ImageGrab.grab(bbox=(left, top, right, bottom))
+            screenshot_path = "screenshot.png"
+            screenshot.save(screenshot_path)
+
+            # Preprocess the image
+            # processed_image = self.preprocess_image(screenshot)
+
+            # Save the preprocessed image
+            # processed_image_path = "processed_screenshot.png"
+            # processed_image.save(processed_image_path)
+
+            # Restore the window's previous opacity
+            self.root.attributes('-alpha', initial_opacity)
+            self.button.config(state='normal')
+            # Add a delay to prevent continuous capturing
+            sleep(0.1)
+
+            # Extract text from the preprocessed image
+            extracted_text = pytesseract.image_to_string(screenshot)  # processed_imag3
+            modified_text = self.modify_text(extracted_text, self.word_mapping)
+            translated_text = self.translate_text(modified_text, self.word_mapping)
+            if extracted_text:
+                # Show the window if not visible
+                if not is_visible:
+                    self.root.deiconify()
+                    is_visible = True
+
+                # Stop any ongoing TTS synthesis
+                self.tts.stop_tts()
+
+                # Start TTS synthesis with the modified extracted text
+                self.tts.start_tts2(translated_text, speed=float(self.speed_slider.get()))
+                self.button.config(state='normal')
+            else:
+                # Debug message when no text is detected
+                print("No text detected in the captured image")
+                self.button.config(state='normal')
+
+            # Enable the capture button after the capture process is complete
+            self.button.config(state='normal')
+
+            if not button_pressed:
+                break
 
     def modify_text(self, text, word_mapping):
         # Split the text into words
@@ -304,6 +421,24 @@ class TransparentWindow:
 
     def run(self):
         self.root.mainloop()
+
+    def toggle_translation(self):
+        if self.skip_translation_var.get():
+            self.source_language_menu.config(state='disabled')
+        else:
+            self.source_language_menu.config(state='normal')
+
+    def translate_text(self, text, word_mapping):
+        if self.skip_translation_var.get():
+            return text  # Return the original text without translation
+        else:
+
+            modified_text = self.modify_text(text, word_mapping)
+            text_to_translate = modified_text
+            source_language = self.source_language_var.get().lower()  # Get the selected source language
+            target_language = dlt.lang.ENGLISH  # Set the default target language (e.g., English)
+            translated_text = mt.translate(text_to_translate, source=source_language, target=target_language)
+            return translated_text
 
 
 class ButtonsWindow:
@@ -381,7 +516,8 @@ class TTSButtons(tk.Frame):
             self,
             text='Female',
             command=lambda: self.set_tts_voice(
-                'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0')  # TTS_MS_en-US_Helen_11.0
+                'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0')
+            # TTS_MS_en-US_Helen_11.0
         )
 
         male_button.pack(side='left', padx=5, pady=5)
@@ -417,6 +553,11 @@ class ColorWheel(tk.Canvas):
 
 
 if __name__ == '__main__':
+    # Create a thread for loading the model
+    model_thread = Thread(target=load_model)
+    model_thread.start()
+
+    model_thread.join()  # Wait for the model loading thread to finish
     tts = TextToSpeech()
     transparent_window = TransparentWindow(tts)
     buttons_window = ButtonsWindow(transparent_window, tts)
